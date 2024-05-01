@@ -40,7 +40,11 @@ get_precision = function(is_anomaly_pred, is_anomaly_true) {
   TP = length(in_outs)
   # Note: please check the examples of 'setdiff' to understand it's behavior
   FP = length(setdiff(outs_pred, outs_true))
-  return(TP / (TP + FP))
+  if (length(in_outs) == 0) {
+    return(0)
+  } else {
+    return(TP / (TP + FP))
+  }
 }
 
 get_recall = function(is_anomaly_pred, is_anomaly_true) {
@@ -48,14 +52,22 @@ get_recall = function(is_anomaly_pred, is_anomaly_true) {
   outs_pred = generate_outliers_ind(is_anomaly_pred)
   outs_true = generate_outliers_ind(is_anomaly_true)
   in_outs = intersect(outs_true, outs_pred)
-  return(length(in_outs) / length(outs_true))
+  if (length(in_outs) == 0) {
+    return(0)
+  } else {
+    return(length(in_outs) / length(outs_true))
+  }
 }
 
 get_F1 = function(is_anomaly_pred, is_anomaly_true) {
   precision = get_precision(is_anomaly_pred, is_anomaly_true)
   recall = get_recall(is_anomaly_pred, is_anomaly_true)
-  F1 = 2 * ((precision * recall) / (precision + recall))
-  return(F1)
+  if (precision == 0 & recall == 0) {
+    return(0)
+  } else {
+    F1 = 2 * ((precision * recall) / (precision + recall))
+    return(F1)
+  }
 }
 
 get_all_metrics = function(is_anomaly_pred, is_anomaly_true) {
@@ -108,16 +120,12 @@ auto_recognize_AO_IO = function(AO, IO) {
   return(arrange(AO_IO_map, ind))
 }
 
-get_outs_fore = function(x) {
-  x_ts = ts(x, frequency = findfrequency(x))
-  outs_ind = tsoutliers(x_ts, iterate = 1)$index
-  is_anomaly = generate_is_anomaly(x, outs_ind)
-  return(is_anomaly)
-}
-
 get_outs_tsa = function(x) {
   x_ts = ts(x, frequency = findfrequency(x))
-  m = auto.arima(x_ts)
+  # TSA's method have no extra effects in SARIMA,
+  # and auto fit a SARIMA will spend tooooo much more time.
+  # So we decide to ban it to fit seansonal.
+  m = auto.arima(x_ts, seasonal = FALSE)
   AO = detectAO(m)
   IO = detectIO(m)
   outs_ind = auto_recognize_AO_IO(AO, IO)$ind
@@ -127,7 +135,8 @@ get_outs_tsa = function(x) {
 
 get_outs_comb = function(x, return_resid=FALSE) {
   if (is.constant(x)) {
-    return(integer(0))
+    is_anomaly_comb = rep(0, length(x))
+    return(is_anomaly_comb)
   }
   x_ts = ts(x, frequency = findfrequency(x))
   comps = mstl(x_ts, robust = TRUE)
@@ -145,13 +154,22 @@ get_outs_comb = function(x, return_resid=FALSE) {
   if (return_resid) {
     return(resid)
   } else {
-    return(get_outs_tsa(resid))
+    is_anomaly_comb = get_outs_tsa(resid)
+    return(is_anomaly_comb)
   }
+}
+
+get_outs_fore = function(x) {
+  x_ts = ts(x, frequency = findfrequency(x))
+  outs_ind = tsoutliers(x_ts, iterate = 1)$index
+  is_anomaly = generate_is_anomaly(x, outs_ind)
+  return(is_anomaly)
 }
 
 get_outs_comb_pro = function(x) {
   if (is.constant(x)) {
-    return(integer(0))
+    is_anomaly_comb_pro = rep(0, length(x))
+    return(is_anomaly_comb_pro)
   }
   resid = get_outs_comb(x, return_resid=TRUE)
   is_anomaly_comb = get_outs_tsa(resid)
@@ -166,10 +184,11 @@ get_outs_comb_pro = function(x) {
 }
 
 get_outs_all_methods = function(x) {
+  is_anomaly_fore = get_outs_fore(x)
   df = tibble(
-    is_anomaly_fore = get_outs_fore(x),
     is_anomaly_tsa = get_outs_tsa(x),
     is_anomaly_comb = get_outs_comb(x),
+    is_anomaly_fore = get_outs_fore(x),
     is_anomaly_comb_pro = get_outs_comb_pro(x)
   )
   return(df)
@@ -179,33 +198,24 @@ test_data = function(df) {
   #' df need to contains three col: 
   #' timestamp, value, is_anomaly
   outs_df = get_outs_all_methods(df$value)
-  recalls = tibble(
-    recall_fore = get_recall(outs_df$is_anomaly_fore, df$is_anomaly),
-    recall_tsa = get_recall(outs_df$is_anomaly_tsa, df$is_anomaly),
-    recall_comb = get_recall(outs_df$is_anomaly_comb, df$is_anomaly),
-    recall_comb_pro = get_recall(outs_df$is_anomaly_comb_pro, df$is_anomaly),
-  )
-  return(list(x = df$value, recalls = recalls))
+  func_temp = function(s) { return(get_all_metrics(outs_df[[s]], df$is_anomaly)) }
+  df_metrics_methods = do.call(rbind, lapply(names(outs_df), func_temp))
+  df_metrics_methods$method = c("Chang", "decomp+Chang", "decomp+IQR", "decomp+Chang+IQR")
+  return(df_metrics_methods)
 }
 
-
-# TODO: not done, don't look please
 test_data_based_csv_path = function(csv_path) {
+  cat("[INFO] Start handle", csv_path, "\n")
   df = readr::read_csv(csv_path)
-  l = test_data(df)
-  l$recalls$data = strsplit(basename(csv_path), "\\.")[[1]][1]
-  return(l)
+  df_metrics_methods = test_data(df)
+  df_metrics_methods$data = strsplit(basename(csv_path), "\\.")[[1]][1]
+  return(df_metrics_methods)
 }
 
 test_data_based_csv_dir = function(csv_dir) {
   csv_files = list.files(csv_dir,
                          pattern = "\\.csv$",
                          full.names = TRUE)
-  l = test_data_based_csv_path(csv_files[1])
-  recalls = test_data_based_csv_path(csv_files[1])$recalls
-  for (i in csv_files[2:length(csv_files)]) {
-    new_row = test_data_based_csv_path(i)$recalls
-    recalls = add_row(recalls, new_row)
-  }
-  return(recalls)
+  df_metrics_methods_multi = do.call(rbind, lapply(csv_files, test_data_based_csv_path))
+  return(df_metrics_methods_multi)
 }
