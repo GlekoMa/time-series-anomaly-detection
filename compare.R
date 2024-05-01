@@ -53,47 +53,23 @@ test_data_synthetic_arma = function(pollution_rate, n = 1000, only_return_dfmm =
 # --------
 dfmm_multi_arma = do.call(rbind, lapply(seq(0.01, 0.2, 0.01), test_data_synthetic_arma))
 
-p_arma = ggplot(dfmm_multi_arma, aes(x = pollution_rate, y = F1, color = method)) +
+df_plot_arma = dfmm_multi_arma
+df_plot_arma$method = case_match(
+  df_plot_arma$method,
+  "Chang" ~ "Chang",
+  "decomp+Chang" ~ "分解+Chang",
+  "decomp+Chang+IQR" ~ "分解+Chang+IQR",
+  "decomp+IQR" ~ "分解+IQR"
+)
+df_plot_arma = rename(
+  df_plot_arma, 
+  污染率 = pollution_rate,
+  算法 = method
+)
+p_arma = ggplot(df_plot_arma, aes(x = 污染率, y = F1, color = 算法)) +
   geom_point() +
   geom_line()
-
 ggsave(paste0(asset_dir, "compare-arma.png"),
   plot = p_arma, width = 8, height = 4
 )
-#recalls = l$recalls
-#for (i in seq(0.02, 0.2, 0.01)) {
-#  new_row = test_data_synthetic_arima(i)$recalls
-#  recalls = add_row(recalls, new_row)
-#}
-#recalls = filter(recalls, !if_any(starts_with("recall"), is.na))
-#
-#recalls_long = pivot_longer(
-#  recalls,
-#  cols = starts_with("recall"),
-#  names_to = "method",
-#  values_to = "recall"
-#)
-#
-#ggplot(recalls_long, aes(x = pollution_rate, y = recall, color = method)) +
-#  geom_line() +
-#  theme_light()
-#
-#
-## Plot test
-## ---------
-#l = test_data_synthetic_arima(pollution_rate = 0.05, n = 50)
-#x_ori = l$x_ori
-#x_pollu = l$x
-#
-## Origin x plot
-#ggplot(x_as_tibble(x_ori), aes(x = timestamp, y = value)) + 
-#  geom_point(size = 0.4) + 
-#  geom_line(linewidth = 0.3) + 
-#  theme_light()
-#
-## Polluted x plot
-#ggplot(x_as_tibble(x_pollu), aes(x = timestamp, y = value)) + 
-#  geom_point(size = 0.01) + 
-#  geom_line()
-#
-#
+
