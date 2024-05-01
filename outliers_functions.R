@@ -3,12 +3,10 @@ library(forecast)
 library(TSA)
 library(showtext)
 
-font_add("SimSun", "/usr/share/fonts/windows-fonts/simsun.ttc")
-font_add("Times New Roman", "/usr/share/fonts/windows-fonts/times.ttf")
+font_add("SourceHanSerif", "SourceHanSerifCN-Regular.otf")
 showtext_auto()
 theme_set(theme_light())
-theme_update(text = element_text(size = 26, family = "SimSun"))
-theme_update(axis.text = element_text(size = 24, family = "Times New Roman"))
+theme_update(text = element_text(size = 26, family = "SourceHanSerif"))
 
 
 # General
