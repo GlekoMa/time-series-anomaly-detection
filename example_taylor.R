@@ -1,11 +1,11 @@
 setwd_lw <- function(src_dir) {
-  if (getwd() == "/home/gleko/lw/src") {
+  if (getwd() == src_dir) {
     print("Yes")
   } else {
-    setwd("/home/gleko/lw/src")
+    setwd(src_dir)
   }
 }
-setwd_lw(src_dir = "/home/gleko/lw/src")
+setwd_lw(src_dir = "/home/gleko/Projects/lw")
 source("outliers_functions.R")
 asset_dir <- "assets/"
 set.seed(30)
