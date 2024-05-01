@@ -52,7 +52,7 @@ df_plot_ori_pollu <- mutate(df_plot_ori_pollu,
 p_ori_pollu <- ggplot(df_plot_ori_pollu, aes(x = 时间, y = `电力需求(MW)`)) +
   geom_point(aes(color = 值类型), size = 0.6) +
   geom_line(linewidth = 0.4) + 
-  scale_color_manual(values = c("正常" = "black", "异常" = "purple")) +
+  scale_color_manual(values = c("正常" = "black", "异常" = "orange")) +
   facet_grid(rows = vars(序列类型))
 ggsave(paste0(asset_dir, "example-taylor-ori-pollu.png"),
   plot = p_ori_pollu, width = 8, height = 4
@@ -198,12 +198,10 @@ print(df_metrics)
 # ------------------------------------------
 df_plot_outs_labeled <- df_with_outs
 df_plot_outs_labeled$is_anomaly <- as.factor(df_plot_outs_labeled$is_anomaly)
-df_plot_outs_labeled$IQR异常 <- generate_is_anomaly(
-  df_plot_outs_labeled$value, outs_ind_IQR
-)
-df_plot_outs_labeled$Chang异常 <- generate_is_anomaly(
-  df_plot_outs_labeled$value, outs_ind_TSA
-)
+df_plot_outs_labeled$异常检测来源 <- rep("-", nrow(df_plot_outs_labeled))
+df_plot_outs_labeled$异常检测来源[outs_ind_TSA] <- "Chang"
+df_plot_outs_labeled$异常检测来源[outs_ind_IQR] <- "IQR"
+df_plot_outs_labeled$异常检测来源[intersect(outs_ind_TSA, outs_ind_IQR)] <- "Chang & IQR"
 df_plot_outs_labeled <- rename(df_plot_outs_labeled,
   时间 = timestamp,
   `电力需求(MW)` = value,
@@ -211,35 +209,12 @@ df_plot_outs_labeled <- rename(df_plot_outs_labeled,
 )
 df_plot_outs_labeled <- mutate(df_plot_outs_labeled, 值类型 = ifelse(值类型 == 0, "正常", "异常"))
 
-ann_time <- as.POSIXct(c("2000-06-21 00:30:00", "2000-06-21 10:00:00", "2000-06-21 13:00:00"))
 p_TSA_IQR <- ggplot(df_plot_outs_labeled, aes(x = 时间, y = `电力需求(MW)`)) +
-  geom_point(mapping = aes(color = 值类型), size = 0.6) +
-  geom_point(
-    data = filter(df_plot_outs_labeled, Chang异常 == 1),
-    pch = 2, size = 3, color = "#E69F00"
-  ) +
-  geom_point(
-    data = filter(df_plot_outs_labeled, IQR异常 == 1),
-    pch = 1, size = 1.75, color = "#E69F00"
-  ) +
+  geom_point(mapping = aes(color = 值类型, shape = 异常检测来源), size = 2) +
   geom_line(linewidth = 0.4) +
-  scale_color_manual(values = c("正常" = "black", "异常" = "purple")) +
-  labs(y = "电力需求(MW)") +
-  annotate(
-    geom = "text", x = ann_time[1],
-    y = df_plot_outs_labeled$`电力需求(MW)`[df_plot_outs_labeled$时间 == ann_time[1]],
-    label = "Chang & IQR异常", hjust = 1.12, vjust = -0.5, size = 7.5, color = "#404040"
-  ) +
-  annotate(
-    geom = "text", x = ann_time[2],
-    y = df_plot_outs_labeled$`电力需求(MW)`[df_plot_outs_labeled$时间 == ann_time[2]],
-    label = "IQR异常", hjust = -0.24, vjust = -0.4, size = 7.5, color = "#404040"
-  ) +
-  annotate(
-    geom = "text", x = ann_time[3],
-    y = df_plot_outs_labeled$`电力需求(MW)`[df_plot_outs_labeled$时间 == ann_time[3]],
-    label = "漏检异常", hjust = -0.18, size = 7.5, color = "#404040"
-  )
+  scale_color_manual(values = c("正常" = "black", "异常" = "orange")) +
+  scale_shape_manual(values = c("-" = 20, "Chang" = 0, "IQR" = 2, "Chang & IQR" = 14)) +
+  labs(y = "电力需求(MW)")
 ggsave(paste0(asset_dir, "example-taylor-TSA-IQR.png"),
   plot = p_TSA_IQR, width = 8, height = 4
 )
