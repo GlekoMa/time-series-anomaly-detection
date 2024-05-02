@@ -2,6 +2,7 @@ library(fpp3)
 library(forecast)
 library(TSA)
 library(showtext)
+library(patchwork)
 
 font_add("SourceHanSerif", "SourceHanSerifCN-Regular.otf")
 showtext_auto()
